@@ -118,15 +118,14 @@ class ContentValidator implements Validator {
 }
 
 class Writer {
-
-    const DEFAULT_TEMPLATE = "default_%s_%d.json";
+    const DEFAULT_TEMPLATE = "default_%s_%s.json";
     private $now = "";
     private $output_path = "";
     private $file_name = "";
 
     public function __construct(Config $config)  {
         $this->now = date("Y-m-d");
-        $this->output_path = $config->getParam("output_path", "results");
+        $this->output_path = sprintf($config->getParam("output_path", "results_%s"), $this->now);
         $this->createOutputPath();
         $this->suggestFilename($config);
     }
@@ -141,7 +140,7 @@ class Writer {
 
         $counter = 0;
         while(true) {
-            $suggestion = sprintf($template, $this->now, ++$counter);
+            $suggestion = sprintf($template, $this->now, str_pad(++$counter, 3, "0", STR_PAD_LEFT));
             if (!file_exists($this->getOutput(false) . $suggestion)) {
                 $this->file_name = $suggestion;
                 break;
@@ -158,9 +157,113 @@ class Writer {
     }
 
     private function getOutput($with_filename = true) {
-        if ($with_filename) return $this->output_path . '/' . $this->file_name;
-        else return $this->output_path . '/';
+        if ($with_filename) return $this->output_path . DIRECTORY_SEPARATOR . $this->file_name;
+        else return $this->output_path . DIRECTORY_SEPARATOR;
     }
+}
+
+class FilesystemCleaner {
+    const DEFAULT_TEMPLATE = "packed_%s.zip";
+    private $output_path = "";
+    private $output_path_zips = "";
+    private $results_folders_pattern;
+    private $unwanted_files = ['..', '.'];
+    private $now;
+
+    public function __construct(Config $config) {
+      $this->now = date("Y-m-d");
+      $this->output_path = sprintf($config->getParam("output_path", "results_%s"), $this->now);
+      $this->output_path_zips = sprintf($config->getParam("output_path", "results_%s"), "old");
+      $this->results_folders_pattern = sprintf($config->getParam("output_path", "results_%s"), "");
+    }
+
+    public function archiveOldResultFiles() {
+        $this->createOutputPath();
+        $files_by_dir = $this->getJsonFilesByDir();
+        foreach($files_by_dir as $dir => $files) {
+          $zip_filename = $this->output_path_zips . DIRECTORY_SEPARATOR . sprintf(
+              self::DEFAULT_TEMPLATE,
+              str_replace(
+                  $this->results_folders_pattern,
+                  "",
+                  $dir
+              )
+          );
+
+          $this->zipFiles($files, $zip_filename);
+          $this->deleteOldDirs($dir);
+        }
+    }
+
+    private function zipFiles($files, $zip_filename) {
+        $zip = new ZipArchive;
+        if ($zip->open($zip_filename, ZipArchive::CREATE) === TRUE) {
+            foreach($files as $json_file) {
+                  print $json_file . "\n";
+                  $zip->addFile($json_file);
+            }
+            $zip->close();
+        }
+    }
+
+    private function deleteOldDirs($dir) {
+        $files = array_diff(scandir($dir), array('.','..'));
+        foreach ($files as $file) {
+            (is_dir($dir . DIRECTORY_SEPARATOR . $file)) ?
+                $this->deleteOldDirs($dir . DIRECTORY_SEPARATOR . $file) :
+                unlink($dir . DIRECTORY_SEPARATOR . $file); 
+        }
+        return rmdir($dir);
+    }
+
+    private function getZipFileNameFromJsonFile($filename) {
+      return str_replace(".json", "", $filename);
+    }
+
+    private function getJsonFilesByDir() {
+        $packages = [];
+        $directories = $this->getResultDirectoriesToClean();
+        foreach($directories as $directory) {
+            $packages[$directory] = array_map(
+                function($file) use ($directory) {
+                    return $directory . DIRECTORY_SEPARATOR . $file;
+                },
+                array_filter(
+                    array_diff(scandir($directory), $this->unwanted_files),
+                    function ($filename) {
+                        // Only the JSON files.
+                        return strpos($filename, ".json") !== false;
+                    }
+                )
+            );
+        }
+
+        return $packages;
+    }
+
+    private function getResultDirectoriesToClean() {
+      // All but the dots and the last result.
+      return array_filter(
+          array_diff(scandir('.'), $this->unwanted_files),
+          function ($filename) {
+              // Only the JSON files.
+              //return strpos($filename, ".json") !== false;
+              return is_dir($filename) &&
+                      strpos($filename, $this->results_folders_pattern) !== FALSE &&
+                      $filename !== $this->output_path &&
+                      $filename !== $this->output_path_zips;
+          }
+      );
+    }
+
+    private function createOutputPath() {
+        if (file_exists($this->output_path_zips)) return;
+
+        if (!mkdir($this->output_path_zips, 0777, true)) {
+            throw new RuntimeException("Could not create output dir. Check permissions!");
+        }
+    }
+
 }
 
 class Timer {
@@ -216,11 +319,13 @@ class Main {
     private $config;
     private $writer;
     private $timer;
+    private $fs_cleaner;
 
     public function init() {
         $this->config = new Config();
         $this->writer = new Writer($this->config);
         $this->timer = new Timer();
+        $this->fs_cleaner = new FilesystemCleaner($this->config);
     }
 
     public function run() {
@@ -269,7 +374,10 @@ class Main {
         } catch (Exception $e) {
             var_dump($e);
         }
+    }
 
+    public function maintenance() {
+        $this->fs_cleaner->archiveOldResultFiles();
     }
 
     private function setValidatorsFromService($service) {
@@ -297,5 +405,6 @@ class Main {
 $app = new Main();
 $app->init();
 $app->run();
+$app->maintenance();
 
 ?>
