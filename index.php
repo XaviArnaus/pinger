@@ -1,5 +1,7 @@
 <?php
-
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
 class Config {
     private $config_file = "./config.json";
@@ -14,7 +16,7 @@ class Config {
             $json_file = $this->readFile();
             $this->config = $this->getJson($json_file);
         } catch (Exception $e) {
-            print "Impossible to read Config file: " . $e->getMessage();
+            print "Impossible to read Config file at [" . realpath($this->config_file) . "]: " . $e->getMessage();
         }
     }
 
@@ -39,7 +41,7 @@ class Config {
     }
 
     private function getJson($file_contents) {
-        return json_decode($file_contents);
+        return json_decode($file_contents, true);
     }
 }
 
@@ -49,10 +51,17 @@ class Retriever {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $request->url);
         curl_setopt($ch, CURLOPT_HEADER, TRUE);
-        curl_setopt($ch, CURLOPT_NOBODY, TRUE); // remove body
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
-        $request->content = curl_exec($ch);
-        $request->statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+        $timer = Timer::quickStart('retriever');
+        $answer = curl_exec($ch);
+        $request->duration = $timer->stop('retriever');
+
+        $header_len = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $request->header = substr($answer, 0, $header_len);
+        $request->body = substr($answer, $header_len);
+
+        $request->status_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
     }
 }
@@ -60,7 +69,9 @@ class Retriever {
 class Request {
     public $url;
     public $status_code;
-    public $content;
+    public $header;
+    public $body;
+    public $duration;
 
     public function __construct($url) {
         $this->url = $url;
@@ -69,6 +80,7 @@ class Request {
 
 interface Validator {
     public function setValidValue($value);
+    public function getValidValue();
     public function isValid(Request $value);
 }
 
@@ -101,13 +113,13 @@ class ContentValidator implements Validator {
     }
 
     public function isValid(Request $request) {
-        return strpos($request->content, $this->valid_value) !== false;
+        return strpos($request->body, $this->valid_value) !== false;
     }
 }
 
 class Writer {
 
-    const DEFAULT_TEMPLATE = "default_%s_%d";
+    const DEFAULT_TEMPLATE = "default_%s_%d.json";
     private $now = "";
     private $output_path = "";
     private $file_name = "";
@@ -120,8 +132,8 @@ class Writer {
     }
 
     public function writeResults(Result $result) {
-        $jsonized = json_encode($result);
-        return file_put_contents($this->output_path . $this->file_name, $jsonized);
+        $jsonized = json_encode($result, JSON_PRETTY_PRINT);
+        return file_put_contents($this->getOutput(true), $jsonized);
     }
 
     private function suggestFilename(Config $config) {
@@ -129,8 +141,8 @@ class Writer {
 
         $counter = 0;
         while(true) {
-            $suggestion = sprintf($template, $this->now, $counter++);
-            if (!file_exists($this->output_path . $suggestion)) {
+            $suggestion = sprintf($template, $this->now, ++$counter);
+            if (!file_exists($this->getOutput(false) . $suggestion)) {
                 $this->file_name = $suggestion;
                 break;
             }
@@ -138,12 +150,43 @@ class Writer {
     }
 
     private function createOutputPath() {
-        if (file_exists($this->output_path)) return;
+        if (file_exists($this->getOutput(false))) return;
 
-        if (!mkdir($this->output_path, 0777, true)) {
+        if (!mkdir($this->getOutput(false), 0777, true)) {
             throw new RuntimeException("Could not create output dir. Check permissions!");
         }
     }
+
+    private function getOutput($with_filename = true) {
+        if ($with_filename) return $this->output_path . '/' . $this->file_name;
+        else return $this->output_path . '/';
+    }
+}
+
+class Timer {
+  private $timers = [];
+
+  public static function quickStart($timer_name) {
+    $quick = new self();
+    $quick->start($timer_name);
+    return $quick;
+  }
+
+  public function start($timer_name) {
+    if (!isset($this->timers[$timer_name])) {
+      $this->timers[$timer_name] = microtime(true);
+    }
+  }
+
+  public function stop($timer_name) {
+    if (isset($this->timers[$timer_name])) {
+      $elapsed = microtime(true) - $this->timers[$timer_name];
+      unset($this->timers[$timer_name]);
+
+      // Already in seconds, as a float.
+      return $elapsed;
+    }
+  }
 }
 
 class ValidationResult {
@@ -152,56 +195,85 @@ class ValidationResult {
     public $is_valid;
 }
 
-class Result {
+class ServiceResult {
     public $service_id;
     public $service_name;
     public $request;
     public $error;
-    public $validationResults = [];
+    public $validation_results = [];
+    public $duration;
+}
+
+class Result {
+  public $version;
+  public $date;
+  public $service_results = [];
+  public $duration;
 }
 
 class Main {
+    const VERSION = 1;
     private $config;
-    private $validators = [];
     private $writer;
+    private $timer;
 
     public function init() {
         $this->config = new Config();
         $this->writer = new Writer($this->config);
+        $this->timer = new Timer();
     }
 
     public function run() {
-        $services = $this->config->getServices();
+        try{
+            $this->timer->start('general');
 
-        foreach($services as $service) {
             $result = new Result();
-            $result->service_id = $service['id'];
-            $result->service_name = $service['name'];
+            $result->version = self::VERSION;
+            $result->date = date("Y-m-d H:i:s");
 
-            $request = new Request($service['url']);
-            $this->setValidatorsFromService($service);
+            $services = $this->config->getServices();
+            foreach($services as $service) {
+                $this->timer->start($service['id']);
+                $service_result = new ServiceResult();
+                $service_result->service_id = $service['id'];
+                $service_result->service_name = $service['name'];
 
-            try {
-                (new Retriever())->requestUrl($request);
-                $result->request = $request;
-            } catch (Exception $e) {
-                $result->request = $request;
-                $result->error = $e;
+                $request = new Request($service['url']);
+                $validators = $this->setValidatorsFromService($service);
+
+                try {
+                    (new Retriever())->requestUrl($request);
+                    $service_result->request = $request;
+
+                    foreach($validators as $validator) {
+                        $validation_result = new ValidationResult();
+                        $validation_result->validation_class = get_class($validator);
+                        $validation_result->valid_value = $validator->getValidValue();
+                        $validation_result->is_valid = $validator->isValid($request);
+
+                        $service_result->validation_results[] = $validation_result;
+                    }
+
+                    $service_result->error = false;
+                } catch (Exception $e) {
+                    $service_result->request = $request;
+                    $service_result->error = $e;
+                }
+
+                $service_result->duration = $this->timer->stop($service['id']);
+                $result->service_results[] = $service_result;
             }
 
-            foreach($this->validators as $validator) {
-                $validation_result = new ValidationResult();
-                $validation_result->valid_value = $validator->getValidValue();
-                $validation_result->is_valid = $validator->isValid($request);
-
-                $result->validationResults[] = $validation_result;
-            }
-
+            $result->duration = $this->timer->stop('general');
             $this->writer->writeResults($result);
+        } catch (Exception $e) {
+            var_dump($e);
         }
+
     }
 
     private function setValidatorsFromService($service) {
+        $validators = [];
         foreach($service["validate"] as $rule => $value) {
 
             $validatorClass = "";
@@ -216,10 +288,14 @@ class Main {
 
             $validator = new $validatorClass();
             $validator->setValidValue($value);
-            $this->validators[] = $validator;
+            $validators[] = $validator;
         }
-
+        return $validators;
     }
 }
+
+$app = new Main();
+$app->init();
+$app->run();
 
 ?>

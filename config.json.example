@@ -1,8 +1,7 @@
 {
   "last-update": "2019-03-19 13:47:00",
-  "version": 1,
   "output_path": "pinger_results",
-  "filename_template": "pinged_at_%%%",
+  "filename_template": "pinged_at_%s_%d.json",
   "services": [
     {
       "id": "i-am-a-string-id",
