@@ -1,0 +1,17 @@
+{
+  "last-update": "2019-03-19 13:47:00",
+  "version": 1,
+  "output_path": "pinger_results",
+  "filename_template": "pinged_at_%%%",
+  "services": [
+    {
+      "id": "i-am-a-string-id",
+      "name": "I am the name of the service",
+      "url": "http://i.am/the/url?to=ping",
+      "validate": {
+        "http-status": 200,
+        "dom-contains": "<h2>I am part of the DOM</h2>"
+      }
+    }
+  ]
+}
