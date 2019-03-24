@@ -1,24 +1,19 @@
-<table>
-    <tr>
-        <td>Service Name</td>
-        <td>{%-NAME-%}</td>
-    </tr>
-    <tr>
-        <td>Requested URL</td>
-        <td>{%-URL-%}</td>
-    </tr>
-    <tr>
-        <td>Duration</td>
-        <td>{%-DURATION-%}</td>
-    </tr>
-    <tr>
-        <td>Error</td>
-        <td>{%-ERROR-%}</td>
-    </tr>
-    <tr>
-        <td colspan="2">Validation Results</td>
-    </tr>
-    <tr>
-        <td colspan="2">{%-VALIDATION RESULTS-%}</td>
-    </tr>
-</table>
+<div class="service-result">
+    <div class="service-name">
+        {%-NAME-%}
+    </div>
+    <div class="requested-url">
+        <a href="{%-URL-%}" target="_blank">
+            {%-URL-%}
+        </a>
+    </div>
+    <div class="duration">
+        Duration: {%-DURATION-%}s
+    </div>
+    <div class="error">
+        Error: {%-ERROR-%}
+    </div>
+    <div class="validation-results">
+        {%-VALIDATION RESULTS-%}
+    </div>
+</div>

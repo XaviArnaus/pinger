@@ -25,7 +25,7 @@ class Reader {
         ) return $this->output_path;
         else {
             $directories = $this->getResultDirectories();
-            if (count($directories) > 0) return $directories[0];
+            if (count($directories) > 0) return array_shift($directories);
             else throw new RuntimeException("No result directories found");
         }
     }
@@ -43,13 +43,14 @@ class Reader {
     }
 
     private function getJsonFilesAtDirectory($directory) {
-        return array_filter(
+        $files =  array_filter(
             array_diff(scandir(self::DIRECTORY_PATH_MODIFICATOR . $directory, SCANDIR_SORT_DESCENDING), $this->unwanted_files),
             function ($filename) {
                 // Only the JSON files.
                 return strpos($filename, ".json") !== false;
             }
         );
+        return $files;
     }
 
     private function getResultDirectories() {
@@ -68,14 +69,15 @@ class Reader {
 class Render {
 
     const DIRECTORY_PATH_MODIFICATOR = '..' . DIRECTORY_SEPARATOR;
-    const VALID = "#27AE60";
-    const INVALID = "#E74C3C";
+    const VALID = "valid";
+    const INVALID = "invalid";
 
     private $results;
     private $templates;
 
     public function __construct() {
         $this->templates = [
+            "styles"            => self::DIRECTORY_PATH_MODIFICATOR . "templates/styles.css",
             "layout"            => self::DIRECTORY_PATH_MODIFICATOR . "templates/layout.html",
             "main_info"         => self::DIRECTORY_PATH_MODIFICATOR . "templates/main_info.html",
             "service_result"    => self::DIRECTORY_PATH_MODIFICATOR . "templates/service_result.html",
@@ -104,7 +106,7 @@ class Render {
                     [
                         "{%-CLASS-%}" => $validation_result["validation_class"],
                         "{%-VALUE-%}" => $validation_result["valid_value"],
-                        "{%-RESULT_COLOR-%}" => boolval($validation_result["is_valid"]) ? self::VALID : self::INVALID
+                        "{%-VALIDATION_RESULT-%}" => boolval($validation_result["is_valid"]) ? self::VALID : self::INVALID
                     ]
                 );
             }
@@ -126,6 +128,7 @@ class Render {
         $content = $this->renderTemplate(
             "layout",
             [
+                "{%-STYLES-%}" => $this->renderTemplate("styles"),
                 "{%-MAIN_INFO-%}" => $main_info_content,
                 "{%-RESULTS-%}" => $service_content
             ]
@@ -145,7 +148,6 @@ class Render {
     private function getTemplateContent($template_name) {
         return file_get_contents($this->templates[$template_name]);
     }
-
 }
 
 
