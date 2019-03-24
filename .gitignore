@@ -4,3 +4,4 @@ config.json
 pinger_results/
 pinger_results_*/
 results/
+public_html/test.html
