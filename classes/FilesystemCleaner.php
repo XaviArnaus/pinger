@@ -37,7 +37,6 @@ class FilesystemCleaner {
         $zip = new ZipArchive;
         if ($zip->open($zip_filename, ZipArchive::CREATE) === TRUE) {
             foreach($files as $json_file) {
-                print $json_file . "\n";
                 $zip->addFile($json_file);
             }
             $zip->close();
@@ -80,12 +79,9 @@ class FilesystemCleaner {
     }
 
     private function getResultDirectoriesToClean() {
-        // All but the dots and the last result.
         return array_filter(
             array_diff(scandir('.'), $this->unwanted_files),
             function ($filename) {
-                // Only the JSON files.
-                //return strpos($filename, ".json") !== false;
                 return is_dir($filename) &&
                     strpos($filename, $this->results_folders_pattern) !== FALSE &&
                     $filename !== $this->output_path &&
