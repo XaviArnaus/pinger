@@ -74,14 +74,16 @@ class Render {
 
     private $results;
     private $templates;
+    private $choosen_template;
 
-    public function __construct() {
+    public function __construct(Config $config) {
+        $this->choosen_template = $config->getParam("display_template", "light");
         $this->templates = [
-            "styles"            => self::DIRECTORY_PATH_MODIFICATOR . "templates/styles.css",
-            "layout"            => self::DIRECTORY_PATH_MODIFICATOR . "templates/layout.html",
-            "main_info"         => self::DIRECTORY_PATH_MODIFICATOR . "templates/main_info.html",
-            "service_result"    => self::DIRECTORY_PATH_MODIFICATOR . "templates/service_result.html",
-            "validation_result" => self::DIRECTORY_PATH_MODIFICATOR . "templates/validation_result.html",
+            "styles"            => self::DIRECTORY_PATH_MODIFICATOR . "templates/" . $this->choosen_template . "/styles.css",
+            "layout"            => self::DIRECTORY_PATH_MODIFICATOR . "templates/" . $this->choosen_template . "/layout.html",
+            "main_info"         => self::DIRECTORY_PATH_MODIFICATOR . "templates/" . $this->choosen_template . "/main_info.html",
+            "service_result"    => self::DIRECTORY_PATH_MODIFICATOR . "templates/" . $this->choosen_template . "/service_result.html",
+            "validation_result" => self::DIRECTORY_PATH_MODIFICATOR . "templates/" . $this->choosen_template . "/validation_result.html",
         ];
     }
 
@@ -160,7 +162,7 @@ class App {
     public function __construct() {
         $this->config = new Config(self::CONFIG_FILE);
         $this->reader = new Reader($this->config);
-        $this->render = new Render();
+        $this->render = new Render($this->config);
     }
 
     public function run() {
