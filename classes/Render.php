@@ -31,6 +31,7 @@ class Render {
         foreach($this->results["service_results"] as $service_result) {
             $params = [
                 "{%-NAME-%}" => $service_result["service_name"],
+                "{%-FAVICON-%}" => $service_result["request"]["favicon"],
                 "{%-URL-%}" => $service_result["request"]["url"],
                 "{%-DURATION-%}" => $service_result["duration"],
                 "{%-ERROR-%}" => $service_result["error"] ? $service_result["error"] : "No",
