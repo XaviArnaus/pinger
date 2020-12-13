@@ -6,6 +6,7 @@ class Request {
     public $header;
     public $body;
     public $duration;
+    public $server_ip;
 
     public function __construct($url) {
         $this->url = $url;

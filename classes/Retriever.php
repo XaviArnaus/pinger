@@ -17,6 +17,7 @@ class Retriever {
         $request->body = substr($answer, $header_len);
 
         $request->status_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $request->server_ip = curl_getinfo($ch, CURLINFO_PRIMARY_IP);
         curl_close($ch);
     }
 }
