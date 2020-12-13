@@ -1,7 +1,7 @@
 {
   "last-update": "2019-03-19 13:47:00",
   "output_path": "pinger_results_%s",
-  "output_latest_filename": "pinger_results_taltest.json",
+  "output_latest_filename": "public_html/pinger_results_latest.json",
   "filename_template": "pinged_at_%s_%s.json",
   "display_template": "light",
   "services": [
