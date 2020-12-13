@@ -97,6 +97,24 @@ An example of a results file could be:
 }
 ```
 
+## The Dashboard
+
+As mentioned above, you can access today's reports by readong the resulting JSON files.
+To make everything a bit more easy and packed, there is a `public_html` directory with a dashboard
+that builds a simple report.
+
+The intended combination is that:
+* The `crontab` runs the root's `index.php` periodically.
+* A webserver points a vhost to `public_html/index.php` to access to the last report.
+
 ### TODO
-* Create a GateWay to serve the files (just the last one? All?)
-* Any kind of security to avoid access to the files without restriction.
+* Use the `latest` generated report instead the logic to find what is the latest.
+* Show any way to relate to previous reports of the day
+* Improve the documentation:
+    * Update the `config.json` options
+    * Explain the `maintenance` actions. Zips!!
+    * Explain the `templates`
+    * Explain the `htaccess` security level
+    * Explain the `Makefile`
+* Improve the `Makefile` by scripting the add of new resources
+
