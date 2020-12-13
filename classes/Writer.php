@@ -5,16 +5,19 @@ class Writer {
     private $now = "";
     private $output_path = "";
     private $file_name = "";
+    private $latest_filename = "";
 
     public function __construct(Config $config)  {
         $this->now = date("Y-m-d");
         $this->output_path = sprintf($config->getParam("output_path", "results_%s"), $this->now);
+        $this->latest_filename = $config->getParam("output_latest_filename");
         $this->createOutputPath();
         $this->suggestFilename($config);
     }
 
     public function writeResults(Result $result) {
         $jsonized = json_encode($result, JSON_PRETTY_PRINT);
+        file_put_contents($this->latest_filename, $jsonized);
         return file_put_contents($this->getOutput(true), $jsonized);
     }
 
@@ -40,6 +43,11 @@ class Writer {
     }
 
     private function getOutput($with_filename = true) {
+        if ($with_filename) return $this->output_path . DIRECTORY_SEPARATOR . $this->file_name;
+        else return $this->output_path . DIRECTORY_SEPARATOR;
+    }
+
+    private function getOutputLatest() {
         if ($with_filename) return $this->output_path . DIRECTORY_SEPARATOR . $this->file_name;
         else return $this->output_path . DIRECTORY_SEPARATOR;
     }

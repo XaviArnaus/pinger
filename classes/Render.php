@@ -36,7 +36,7 @@ class Render {
                 "{%-ERROR-%}" => $service_result["error"] ? $service_result["error"] : "No",
                 "{%-SERVER-%}" => $service_result["request"]["server_ip"],
                 "{%-HEADER-%}" => explode("\n", $service_result["request"]["header"])[0],
-                "{%-CONTENT-%}" => htmlentities(substr($service_result["request"]["body"], 0, 30), ENT_QUOTES | ENT_IGNORE, "UTF-8") . "...",
+                "{%-CONTENT-%}" => substr(strip_tags(htmlentities($service_result["request"]["body"])), 0, 40) . "..."
             ];
             $validation_content = "";
             foreach ($service_result["validation_results"] as $validation_result) {
