@@ -12,6 +12,10 @@ class ContentValidator implements Validator {
     }
 
     public function isValid(Request $request) {
-        return strpos($request->body, $this->valid_value) !== false;
+        if (len($this->valid_value) > 0) {
+            return strpos($request->body, $this->valid_value) !== false;
+        } else {
+            return len($this->valid_value) == len($request->body);
+        }
     }
 }
